@@ -1,61 +1,37 @@
 #!/usr/bin/env python3
 """
 中国M1/M2货币供应量月度数据抓取脚本
-使用 cn-stats 库获取国家统计局数据，支持增量更新
+使用 akshare 库获取央行口径的货币供应量数据，支持增量更新
 """
 
 import os
 import pandas as pd
 from datetime import datetime
-from cnstats.stats import stats
-import time
+import akshare as ak
 
-# ========== 配置区 ==========
-M2_CODE = 'A0D0101'      # 货币和准货币(M2)供应量_期末值
-M1_CODE = 'A0D0103'      # 货币(M1)供应量_期末值
-DBCODE = 'hgyd'          # 宏观月度数据库
 DATA_FILE = 'money_supply.csv'
-# ===========================
 
-def fetch_single_indicator(zbcode, date_str):
+def fetch_m1_m2():
+    """获取 M1 和 M2 月度数据，返回 DataFrame 包含 date, m1, m2"""
     try:
-        result = stats(
-            zbcode=zbcode,
-            datestr=date_str,
-            dbcode=DBCODE,
-            as_df=True
-        )
-        if result is not None and len(result) > 0:
-            value_row = result[result['指标代码'] == zbcode]
-            if len(value_row) > 0:
-                return float(value_row.iloc[0]['数值'])
-        return None
+        # akshare 的 macro_china_money_supply 返回包含 M0, M1, M2 的月度数据
+        df = ak.macro_china_money_supply()
+        # 根据 akshare 返回的列名处理（常见为 'month', 'm0', 'm1', 'm2'）
+        if 'month' in df.columns:
+            df = df[['month', 'm1', 'm2']]
+            df.rename(columns={'month': 'date'}, inplace=True)
+        else:
+            # 兼容不同版本，假设列名为 '日期', 'M1', 'M2'
+            df = df[['日期', 'M1', 'M2']]
+            df.rename(columns={'日期': 'date', 'M1': 'm1', 'M2': 'm2'}, inplace=True)
+        # 确保日期格式为 YYYYMM 字符串
+        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y%m')
+        # 按日期排序
+        df = df.sort_values('date')
+        return df
     except Exception as e:
-        print(f"  抓取失败: {e}")
+        print(f"抓取失败: {e}")
         return None
-
-def fetch_monthly_data(year_start=2016, year_end=None):
-    if year_end is None:
-        year_end = datetime.now().year
-    all_data = []
-    for year in range(year_start, year_end + 1):
-        for month in range(1, 13):
-            date_str = f"{year}{month:02d}"
-            if year == year_end and month > datetime.now().month:
-                continue
-            print(f"正在获取 {date_str}...")
-            m2_value = fetch_single_indicator(M2_CODE, date_str)
-            time.sleep(0.3)
-            m1_value = fetch_single_indicator(M1_CODE, date_str)
-            time.sleep(0.3)
-            if m2_value is not None or m1_value is not None:
-                all_data.append({
-                    'date': date_str,
-                    'm1': m1_value,
-                    'm2': m2_value
-                })
-                print(f"  ✓ M1: {m1_value:.2f} 亿元, M2: {m2_value:.2f} 亿元")
-    return pd.DataFrame(all_data)
 
 def load_existing_data():
     if os.path.exists(DATA_FILE):
@@ -71,58 +47,34 @@ def save_data(df):
 
 def main():
     print("=" * 60)
-    print("中国M1/M2货币供应量数据抓取工具")
-    print(f"M2指标代码: {M2_CODE} | M1指标代码: {M1_CODE}")
+    print("中国M1/M2货币供应量数据抓取工具 (akshare)")
     print("=" * 60)
+    
+    # 加载已有数据
     existing_df = load_existing_data()
     print(f"已有数据: {len(existing_df)} 条")
-    if len(existing_df) > 0:
-        latest_date = existing_df['date'].max()
-        latest_year = int(latest_date[:4])
-        latest_month = int(latest_date[4:6])
-        print(f"上次更新至: {latest_date}")
-        start_year = latest_year
-        start_month = latest_month + 1
-        if start_month > 12:
-            start_year += 1
-            start_month = 1
-    else:
-        start_year = 2016
-        start_month = 1
-        print("无历史数据，开始全量抓取...")
-    new_data = []
-    current_year = start_year
-    current_month = start_month
-    while current_year <= datetime.now().year:
-        date_str = f"{current_year}{current_month:02d}"
-        if current_year == datetime.now().year and current_month > datetime.now().month:
-            break
-        print(f"正在获取 {date_str}...")
-        m2_value = fetch_single_indicator(M2_CODE, date_str)
-        time.sleep(0.3)
-        m1_value = fetch_single_indicator(M1_CODE, date_str)
-        time.sleep(0.3)
-        if m2_value is not None or m1_value is not None:
-            new_data.append({
-                'date': date_str,
-                'm1': m1_value,
-                'm2': m2_value
-            })
-            print(f"  ✓ M1: {m1_value:.2f} 亿元, M2: {m2_value:.2f} 亿元")
-        current_month += 1
-        if current_month > 12:
-            current_month = 1
-            current_year += 1
-    if new_data:
-        new_df = pd.DataFrame(new_data)
-        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        combined_df = combined_df.drop_duplicates(subset=['date'], keep='last')
-        combined_df = combined_df.sort_values('date')
-        save_data(combined_df)
-        print(f"本次新增 {len(new_data)} 条记录")
-    else:
-        print("没有新数据需要更新")
-    return combined_df
+    
+    # 抓取最新数据
+    new_df = fetch_m1_m2()
+    if new_df is None or new_df.empty:
+        print("抓取失败，请检查网络或数据源")
+        return
+    
+    print(f"抓取到 {len(new_df)} 条数据")
+    print(f"最新数据时间范围: {new_df['date'].min()} 至 {new_df['date'].max()}")
+    
+    # 合并数据（去重，以新数据为准）
+    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+    combined_df = combined_df.drop_duplicates(subset=['date'], keep='last')
+    combined_df = combined_df.sort_values('date')
+    
+    # 只保留过去10年（从当前年份往前推10年）
+    current_year = datetime.now().year
+    start_year = current_year - 10
+    combined_df = combined_df[combined_df['date'].astype(str) >= f"{start_year}01"]
+    
+    save_data(combined_df)
+    print(f"数据已合并，共 {len(combined_df)} 条记录（过去10年）")
 
 if __name__ == "__main__":
     main()
