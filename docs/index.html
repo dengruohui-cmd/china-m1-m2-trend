@@ -149,7 +149,7 @@
         });
         
         // 显示数据更新时间（从 GitHub API 获取 data.js 的最后提交时间）
-        fetch('https://api.github.com/repos/dengruohui/china-m1-m2-trend/commits?path=docs/data.js&per_page=1')
+        fetch('https://api.github.com/repos/dengruohui-cmd/china-m1-m2-trend/commits?path=docs/data.js&per_page=1')
             .then(res => res.json())
             .then(data => {
                 if (data[0] && data[0].commit) {
