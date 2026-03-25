@@ -1,107 +1,165 @@
-<!-- 引入数据文件（由 GitHub Actions 自动生成） -->
-<script src="data.js"></script>
-<script>
-    var chartDom = document.getElementById('chart');
-    var myChart = echarts.init(chartDom);
-    
-    var option = {
-        tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'shadow' },
-            formatter: function(params) {
-                let date = params[0].axisValue;
-                // 提取 M1, M2, 居民存款的值（注意顺序与 series 对应）
-                let m1Val = (params[0].value / 10000).toFixed(1);
-                let m2Val = (params[1].value / 10000).toFixed(1);
-                let depositVal = (params[2].value / 10000).toFixed(1);
-                return `${date}<br/>M1: ${m1Val} 万亿元<br/>M2: ${m2Val} 万亿元<br/>居民存款: ${depositVal} 万亿元`;
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>中国M1/M2货币供应量趋势</title>
+    <!-- 引入 ECharts 核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .sub {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        #chart {
+            width: 100%;
+            height: 500px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #999;
+            text-align: center;
+        }
+        .update-time {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+        @media (max-width: 600px) {
+            #chart {
+                height: 400px;
             }
-        },
-        legend: {
-            data: ['M1 (狭义货币)', 'M2 (广义货币)', '居民存款'],
-            left: 'center',
-            top: 0,
-            icon: 'circle'
-        },
-        grid: {
-            left: '8%',
-            right: '8%',
-            bottom: '8%',
-            top: '12%',
-            containLabel: true
-        },
-        xAxis: {
-            type: 'category',
-            data: chartData.xAxis,
-            axisLabel: {
-                rotate: 45,
-                interval: 'auto',
-                fontSize: 10
-            },
-            name: '日期',
-            nameLocation: 'middle',
-            nameGap: 35
-        },
-        yAxis: {
-            type: 'value',
-            name: '货币供应量 (万亿元)',
-            axisLabel: {
-                formatter: function(value) {
-                    return (value / 10000).toFixed(0);
+            h1 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>中国M1/M2货币供应量月度趋势</h1>
+    <div class="sub">数据来源：国家统计局（中国人民银行口径）</div>
+    <div id="chart"></div>
+    <div class="update-time" id="updateTime">更新日期：加载中...</div>
+    <div class="footer">鼠标悬停/手指长按可查看具体数值 | 每月15日自动更新</div>
+
+    <!-- 引入数据文件（由 GitHub Actions 自动生成） -->
+    <script src="data.js"></script>
+    <script>
+        // 绘制图表（仅 M1 和 M2）
+        var chartDom = document.getElementById('chart');
+        var myChart = echarts.init(chartDom);
+        
+        // 配置项
+        var option = {
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                formatter: function(params) {
+                    // 只显示 M1 和 M2
+                    let date = params[0].axisValue;
+                    let m1Val = (params[0].value / 10000).toFixed(1);
+                    let m2Val = (params[1].value / 10000).toFixed(1);
+                    return `${date}<br/>M1: ${m1Val} 万亿元<br/>M2: ${m2Val} 万亿元`;
                 }
             },
-            scale: true
-        },
-        series: [
-            {
-                name: 'M1 (狭义货币)',
-                type: 'line',
-                data: chartData.m1,
-                symbol: 'circle',
-                symbolSize: 4,
-                lineStyle: { width: 2, color: '#E76F51' },
-                itemStyle: { color: '#E76F51' },
-                smooth: false,
-                tooltip: { valueFormatter: (value) => (value / 10000).toFixed(1) + ' 万亿元' }
+            legend: {
+                data: ['M1 (狭义货币)', 'M2 (广义货币)'],
+                left: 'center',
+                top: 0,
+                icon: 'circle'
             },
-            {
-                name: 'M2 (广义货币)',
-                type: 'line',
-                data: chartData.m2,
-                symbol: 'circle',
-                symbolSize: 4,
-                lineStyle: { width: 2, color: '#2E86AB' },
-                itemStyle: { color: '#2E86AB' },
-                smooth: false,
-                tooltip: { valueFormatter: (value) => (value / 10000).toFixed(1) + ' 万亿元' }
+            grid: {
+                left: '8%',
+                right: '8%',
+                bottom: '8%',
+                top: '12%',
+                containLabel: true
             },
-            {
-                name: '居民存款',
-                type: 'line',
-                data: chartData.householdDeposit,
-                symbol: 'diamond',
-                symbolSize: 4,
-                lineStyle: { width: 2, color: '#A23B72' },
-                itemStyle: { color: '#A23B72' },
-                smooth: false,
-                tooltip: { valueFormatter: (value) => (value / 10000).toFixed(1) + ' 万亿元' }
-            }
-        ]
-    };
-    
-    myChart.setOption(option);
-    window.addEventListener('resize', function() { myChart.resize(); });
-    
-    // 显示更新时间（不变）
-    fetch('https://api.github.com/repos/你的用户名/仓库名/commits?path=docs/data.js&per_page=1')
-        .then(res => res.json())
-        .then(data => {
-            if (data[0] && data[0].commit) {
-                let date = new Date(data[0].commit.committer.date);
-                document.getElementById('updateTime').innerText = '最新数据：' + date.toLocaleString('zh-CN');
-            }
-        })
-        .catch(() => {
-            document.getElementById('updateTime').innerText = '更新日期：请查看仓库';
+            xAxis: {
+                type: 'category',
+                data: chartData.xAxis,
+                axisLabel: {
+                    rotate: 45,
+                    interval: 'auto',
+                    fontSize: 10
+                },
+                name: '日期',
+                nameLocation: 'middle',
+                nameGap: 35
+            },
+            yAxis: {
+                type: 'value',
+                name: '货币供应量 (万亿元)',
+                axisLabel: {
+                    formatter: function(value) {
+                        return (value / 10000).toFixed(0);
+                    }
+                },
+                scale: true
+            },
+            series: [
+                {
+                    name: 'M1 (狭义货币)',
+                    type: 'line',
+                    data: chartData.m1,
+                    symbol: 'circle',
+                    symbolSize: 4,
+                    lineStyle: { width: 2, color: '#E76F51' },
+                    itemStyle: { color: '#E76F51' },
+                    smooth: false,
+                    tooltip: { valueFormatter: (value) => (value / 10000).toFixed(1) + ' 万亿元' }
+                },
+                {
+                    name: 'M2 (广义货币)',
+                    type: 'line',
+                    data: chartData.m2,
+                    symbol: 'circle',
+                    symbolSize: 4,
+                    lineStyle: { width: 2, color: '#2E86AB' },
+                    itemStyle: { color: '#2E86AB' },
+                    smooth: false,
+                    tooltip: { valueFormatter: (value) => (value / 10000).toFixed(1) + ' 万亿元' }
+                }
+            ]
+        };
+        
+        myChart.setOption(option);
+        
+        // 窗口大小变化时自适应
+        window.addEventListener('resize', function() {
+            myChart.resize();
         });
-</script>
+        
+        // 显示数据更新时间（从 GitHub API 获取 data.js 的最后提交时间）
+        fetch('https://api.github.com/repos/你的用户名/仓库名/commits?path=docs/data.js&per_page=1')
+            .then(res => res.json())
+            .then(data => {
+                if (data[0] && data[0].commit) {
+                    let date = new Date(data[0].commit.committer.date);
+                    document.getElementById('updateTime').innerText = '最新数据：' + date.toLocaleString('zh-CN');
+                }
+            })
+            .catch(() => {
+                document.getElementById('updateTime').innerText = '更新日期：请查看仓库';
+            });
+    </script>
+</body>
+</html>
