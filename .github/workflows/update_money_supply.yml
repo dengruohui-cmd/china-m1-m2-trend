@@ -22,7 +22,7 @@ jobs:
 
       - name: 安装依赖
         run: |
-          pip install pandas matplotlib cn-stats
+          pip install pandas matplotlib akshare
 
       - name: 抓取M1/M2数据
         run: python fetch_money_supply.py
