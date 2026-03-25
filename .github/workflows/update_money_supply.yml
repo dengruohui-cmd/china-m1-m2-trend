@@ -1,0 +1,39 @@
+name: 更新M1/M2货币供应量数据
+
+on:
+  schedule:
+    - cron: '0 2 15 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-plot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          pip install pandas matplotlib cn-stats
+
+      - name: 抓取M1/M2数据
+        run: python fetch_money_supply.py
+
+      - name: 生成 JavaScript 数据文件
+        run: python generate_data_js.py
+
+      - name: 提交并推送更新
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-update: M1/M2货币供应量数据 $(date '+%Y-%m-%d')"
+          commit_user_name: "Data Bot"
+          commit_user_email: "bot@example.com"
+          file_pattern: "*.csv docs/*.js docs/*.html"
