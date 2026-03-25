@@ -31,24 +31,43 @@ def fetch_m1_m2():
 def fetch_household_deposit():
     """获取住户存款月度数据，返回 DataFrame 包含 date, household_deposit"""
     try:
-        # 金融机构本外币信贷收支表 - 住户存款
         df = ak.macro_china_depository_institutions_liabilities()
-        # 根据 akshare 实际返回的列名处理（通常包含 'item', 'value' 或类似）
-        # 我们需要筛选出“住户存款”项，并按日期展开
-        # 常见格式：columns = ['日期', '项目', '数值']
-        # 我们按日期 pivot 出住户存款
-        if '项目' in df.columns:
-            # 筛选住户存款
-            household = df[df['项目'].str.contains('住户存款')].copy()
-            household = household[['日期', '数值']]
-            household.rename(columns={'日期': 'date', '数值': 'household_deposit'}, inplace=True)
-            household['date'] = pd.to_datetime(household['date']).dt.strftime('%Y%m')
-            household = household.sort_values('date')
-            return household
+        print("住户存款原始数据列名:", df.columns.tolist())
+        
+        # 自动识别列名
+        date_col = None
+        item_col = None
+        value_col = None
+        if '日期' in df.columns:
+            date_col = '日期'
+            item_col = '项目'
+            value_col = '数值'
+        elif 'date' in df.columns:
+            date_col = 'date'
+            item_col = 'item'
+            value_col = 'value'
         else:
-            # 兼容不同版本
-            print("警告：无法识别 akshare 返回的列名，请检查 akshare 版本")
+            # 其他格式：假设第一列是日期，第二列是指标，第三列是数值
+            if df.shape[1] >= 3:
+                date_col = df.columns[0]
+                item_col = df.columns[1]
+                value_col = df.columns[2]
+            else:
+                print("无法识别列结构，返回空")
+                return None
+        
+        # 筛选包含“住户存款”的行
+        household = df[df[item_col].astype(str).str.contains('住户存款')].copy()
+        if household.empty:
+            print("未找到住户存款项")
             return None
+        
+        # 提取需要的列并重命名
+        household = household[[date_col, value_col]]
+        household.rename(columns={date_col: 'date', value_col: 'household_deposit'}, inplace=True)
+        household['date'] = pd.to_datetime(household['date']).dt.strftime('%Y%m')
+        household = household.sort_values('date')
+        return household
     except Exception as e:
         print(f"抓取住户存款失败: {e}")
         return None
@@ -57,7 +76,6 @@ def load_existing_data():
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
         df['date'] = df['date'].astype(str)
-        # 确保所有列存在（兼容旧数据）
         for col in ['m1', 'm2', 'household_deposit']:
             if col not in df.columns:
                 df[col] = None
@@ -88,8 +106,11 @@ def main():
     # 抓取住户存款
     deposit_df = fetch_household_deposit()
     if deposit_df is None or deposit_df.empty:
-        print("住户存款抓取失败，继续使用已有数据")
-        deposit_df = pd.DataFrame(columns=['date', 'household_deposit'])
+        print("住户存款抓取失败，将创建空列")
+        # 创建一个包含所有日期的空 DataFrame
+        deposit_df = pd.DataFrame({'date': m1m2_df['date'], 'household_deposit': None})
+    else:
+        print(f"住户存款抓取到 {len(deposit_df)} 条数据")
     
     # 合并 M1/M2 和住户存款
     combined = pd.merge(m1m2_df, deposit_df, on='date', how='left')
@@ -99,7 +120,7 @@ def main():
     all_df = all_df.drop_duplicates(subset=['date'], keep='last')
     all_df = all_df.sort_values('date')
     
-    # 只保留过去10年（从当前年份往前推10年）
+    # 只保留过去10年
     current_year = datetime.now().year
     start_year = current_year - 10
     all_df = all_df[all_df['date'].astype(str) >= f"{start_year}01"]
