@@ -16,26 +16,24 @@ def main():
         return
 
     df = pd.read_csv(CSV_FILE)
-    # 按日期排序
     df = df.sort_values('date')
-    # 将日期格式转为 'YYYY-MM'
     df['date_str'] = pd.to_datetime(df['date'], format='%Y%m').dt.strftime('%Y-%m')
 
-    # 准备 ECharts 需要的数据结构
     xAxis_data = df['date_str'].tolist()
     m1_data = df['m1'].tolist()
     m2_data = df['m2'].tolist()
+    # 新增居民存款数据
+    deposit_data = df['household_deposit'].tolist()
 
-    # 构建 JavaScript 代码
     js_content = f"""// 自动生成的数据文件，请勿手动修改
 var chartData = {{
     xAxis: {json.dumps(xAxis_data, ensure_ascii=False)},
     m1: {json.dumps(m1_data)},
-    m2: {json.dumps(m2_data)}
+    m2: {json.dumps(m2_data)},
+    householdDeposit: {json.dumps(deposit_data)}
 }};
 """
 
-    # 确保 docs 目录存在
     os.makedirs('docs', exist_ok=True)
     with open(JS_FILE, 'w', encoding='utf-8') as f:
         f.write(js_content)
