@@ -22,8 +22,13 @@ def main():
     xAxis_data = df['date_str'].tolist()
     m1_data = df['m1'].tolist()
     m2_data = df['m2'].tolist()
-    # 新增居民存款数据
-    deposit_data = df['household_deposit'].tolist()
+    
+    # 确保 household_deposit 列存在，如果不存在则创建空列表
+    if 'household_deposit' in df.columns:
+        deposit_data = df['household_deposit'].tolist()
+    else:
+        deposit_data = [None] * len(df)
+        print("警告：CSV 中缺少 household_deposit 列，将使用空数据")
 
     js_content = f"""// 自动生成的数据文件，请勿手动修改
 var chartData = {{
